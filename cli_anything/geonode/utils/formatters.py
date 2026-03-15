@@ -124,3 +124,103 @@ def format_config(config):
     """Print config key-value pairs."""
     for key, val in config.items():
         click.echo(f"  {key:<15} {val}")
+
+
+def format_geoapp_list(data):
+    """Print geoapp list."""
+    format_resource_list(data, "geoapps")
+
+
+def format_harvester_list(data):
+    """Print harvester list."""
+    harvesters = data.get("harvesters", data.get("results", []))
+    if not harvesters:
+        click.echo("No harvesters found.")
+        return
+    click.echo(f"{'ID':<8} {'Name':<30} {'URL':<35}")
+    click.echo("-" * 73)
+    for h in harvesters:
+        pk = h.get("pk", h.get("id", ""))
+        name = str(h.get("name", ""))[:28]
+        url = str(h.get("remote_url", ""))[:33]
+        click.echo(f"{pk:<8} {name:<30} {url:<35}")
+
+
+def format_execution_list(data):
+    """Print execution request list."""
+    items = data.get("requests", data.get("results", []))
+    if not items:
+        click.echo("No execution requests found.")
+        return
+    click.echo(f"{'ID':<38} {'Action':<15} {'Status':<12} {'Created':<20}")
+    click.echo("-" * 85)
+    for e in items:
+        eid = str(e.get("exec_id", e.get("id", "")))[:36]
+        action = str(e.get("action", ""))[:13]
+        status = str(e.get("status", ""))[:10]
+        created = str(e.get("created", ""))[:18]
+        click.echo(f"{eid:<38} {action:<15} {status:<12} {created:<20}")
+
+
+def format_facet_list(data):
+    """Print facet list."""
+    facets = data.get("facets", data.get("results", []))
+    if isinstance(facets, list):
+        if not facets:
+            click.echo("No facets found.")
+            return
+        for f in facets:
+            if isinstance(f, dict):
+                click.echo(f"  {f.get('name', f.get('label', str(f)))}")
+            else:
+                click.echo(f"  {f}")
+    elif isinstance(facets, dict):
+        for name, info in facets.items():
+            click.echo(f"  {name}")
+    else:
+        click.echo(str(data))
+
+
+def format_category_list(data):
+    """Print category list."""
+    categories = data.get("categories", data.get("results", []))
+    if not categories:
+        click.echo("No categories found.")
+        return
+    click.echo(f"{'ID':<8} {'Identifier':<25} {'Description':<40}")
+    click.echo("-" * 73)
+    for c in categories:
+        pk = c.get("pk", c.get("id", ""))
+        ident = str(c.get("identifier", c.get("slug", "")))[:23]
+        desc = str(c.get("description", c.get("gn_description", "")))[:38]
+        click.echo(f"{pk:<8} {ident:<25} {desc:<40}")
+
+
+def format_region_list(data):
+    """Print region list."""
+    regions = data.get("regions", data.get("results", []))
+    if not regions:
+        click.echo("No regions found.")
+        return
+    click.echo(f"{'ID':<8} {'Code':<10} {'Name':<40}")
+    click.echo("-" * 58)
+    for r in regions:
+        pk = r.get("pk", r.get("id", ""))
+        code = str(r.get("code", ""))[:8]
+        name = str(r.get("name", ""))[:38]
+        click.echo(f"{pk:<8} {code:<10} {name:<40}")
+
+
+def format_keyword_list(data):
+    """Print keyword list."""
+    keywords = data.get("keywords", data.get("results", []))
+    if not keywords:
+        click.echo("No keywords found.")
+        return
+    click.echo(f"{'ID':<8} {'Name':<30} {'Slug':<30}")
+    click.echo("-" * 68)
+    for k in keywords:
+        pk = k.get("pk", k.get("id", ""))
+        name = str(k.get("name", ""))[:28]
+        slug = str(k.get("slug", ""))[:28]
+        click.echo(f"{pk:<8} {name:<30} {slug:<30}")
