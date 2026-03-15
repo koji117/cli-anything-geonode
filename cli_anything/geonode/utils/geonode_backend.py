@@ -11,8 +11,7 @@ def find_geonode(url="http://localhost:8000"):
     url = url.rstrip("/")
     api_url = f"{url}/api/v2/"
     try:
-        resp = requests.get(api_url, timeout=10,
-                            headers={"Accept": "application/json"})
+        resp = requests.get(api_url, timeout=10, headers={"Accept": "application/json"})
         if resp.status_code < 400:
             return {"url": url, "reachable": True, "status": resp.status_code}
     except requests.ConnectionError:

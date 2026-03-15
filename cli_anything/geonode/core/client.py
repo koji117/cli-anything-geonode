@@ -9,6 +9,7 @@ import requests
 
 class GeoNodeError(Exception):
     """Error from GeoNode REST API."""
+
     def __init__(self, message, status_code=None, response_text=None):
         super().__init__(message)
         self.status_code = status_code
@@ -139,8 +140,7 @@ class GeoNodeClient:
     def upload_dataset_metadata(self, pk, xml_file_path):
         """Upload ISO metadata XML for a dataset (PUT)."""
         with open(xml_file_path, "rb") as f:
-            resp = self._put(f"datasets/{pk}/metadata",
-                             files={"metadata_file": f})
+            resp = self._put(f"datasets/{pk}/metadata", files={"metadata_file": f})
         return resp.json()
 
     def get_dataset_maplayers(self, pk):
@@ -289,9 +289,14 @@ class GeoNodeClient:
         return resp.json()
 
     def search_resources(self, query, page=1, page_size=10):
-        resp = self._get("resources", params={
-            "search": query, "page": page, "page_size": page_size,
-        })
+        resp = self._get(
+            "resources",
+            params={
+                "search": query,
+                "page": page,
+                "page_size": page_size,
+            },
+        )
         return resp.json()
 
     def get_resource(self, pk):
@@ -353,7 +358,7 @@ class GeoNodeClient:
 
     def async_delete_resource(self, pk):
         """Delete resource asynchronously (returns execution_id)."""
-        resp = self._delete(f"resources/{pk}/delete")
+        self._delete(f"resources/{pk}/delete")
         return {"pk": pk, "async_delete": True}
 
     def copy_resource(self, pk):
@@ -364,24 +369,28 @@ class GeoNodeClient:
     # ── Resource listings (filtered) ──
 
     def list_approved_resources(self, page=1, page_size=10):
-        resp = self._get("resources/approved", params={
-            "page": page, "page_size": page_size})
+        resp = self._get(
+            "resources/approved", params={"page": page, "page_size": page_size}
+        )
         return resp.json()
 
     def list_published_resources(self, page=1, page_size=10):
-        resp = self._get("resources/published", params={
-            "page": page, "page_size": page_size})
+        resp = self._get(
+            "resources/published", params={"page": page, "page_size": page_size}
+        )
         return resp.json()
 
     def list_featured_resources(self, page=1, page_size=10):
-        resp = self._get("resources/featured", params={
-            "page": page, "page_size": page_size})
+        resp = self._get(
+            "resources/featured", params={"page": page, "page_size": page_size}
+        )
         return resp.json()
 
     def list_favorite_resources(self, page=1, page_size=10):
         """List current user's favorite resources."""
-        resp = self._get("resources/favorites", params={
-            "page": page, "page_size": page_size})
+        resp = self._get(
+            "resources/favorites", params={"page": page, "page_size": page_size}
+        )
         return resp.json()
 
     def get_resource_types(self):
@@ -407,22 +416,26 @@ class GeoNodeClient:
         """Set resource thumbnail (PUT). Supports file, URL, or base64."""
         if file_path:
             with open(file_path, "rb") as f:
-                resp = self._put(f"resources/{pk}/set-thumbnail",
-                                 files={"thumbnail": f})
+                resp = self._put(
+                    f"resources/{pk}/set-thumbnail", files={"thumbnail": f}
+                )
         elif url:
-            resp = self._put(f"resources/{pk}/set-thumbnail",
-                             json={"thumbnail_url": url})
+            resp = self._put(
+                f"resources/{pk}/set-thumbnail", json={"thumbnail_url": url}
+            )
         elif base64_data:
-            resp = self._put(f"resources/{pk}/set-thumbnail",
-                             json={"thumbnail": base64_data})
+            resp = self._put(
+                f"resources/{pk}/set-thumbnail", json={"thumbnail": base64_data}
+            )
         else:
             raise GeoNodeError("Must provide file_path, url, or base64_data")
         return resp.json()
 
     def set_thumbnail_from_bbox(self, pk, bbox, srid="EPSG:4326"):
         """Set thumbnail from bounding box (POST)."""
-        resp = self._post(f"resources/{pk}/set-thumbnail-from-bbox",
-                          json={"bbox": bbox, "srid": srid})
+        resp = self._post(
+            f"resources/{pk}/set-thumbnail-from-bbox", json={"bbox": bbox, "srid": srid}
+        )
         return resp.json()
 
     # ── Extra metadata ──
@@ -463,14 +476,14 @@ class GeoNodeClient:
 
     def add_linked_resources(self, pk, linked_pks):
         """Add linked resources (POST)."""
-        resp = self._post(f"resources/{pk}/linked-resources",
-                          json={"target": linked_pks})
+        resp = self._post(
+            f"resources/{pk}/linked-resources", json={"target": linked_pks}
+        )
         return resp.json()
 
     def remove_linked_resources(self, pk, linked_pks):
         """Remove linked resources (DELETE)."""
-        self._delete(f"resources/{pk}/linked-resources",
-                     json={"target": linked_pks})
+        self._delete(f"resources/{pk}/linked-resources", json={"target": linked_pks})
         return {"pk": pk, "unlinked": linked_pks}
 
     # ── Assets ──
@@ -478,8 +491,7 @@ class GeoNodeClient:
     def upload_asset(self, pk, file_path):
         """Upload and create asset for a resource (POST)."""
         with open(file_path, "rb") as f:
-            resp = self._post(f"resources/{pk}/assets",
-                              files={"asset_file": f})
+            resp = self._post(f"resources/{pk}/assets", files={"asset_file": f})
         return resp.json()
 
     def delete_asset(self, pk, asset_id):
@@ -546,8 +558,9 @@ class GeoNodeClient:
     # Uploads / Imports
     # ═══════════════════════════════════════════════════════════════════════
 
-    def upload_dataset(self, file_path, title=None, abstract=None,
-                       category=None, keywords=None):
+    def upload_dataset(
+        self, file_path, title=None, abstract=None, category=None, keywords=None
+    ):
         """Upload a geospatial dataset file (async via /uploads/upload/)."""
         url = f"{self.base_url}/uploads/upload/"
         with open(file_path, "rb") as f:
@@ -560,7 +573,9 @@ class GeoNodeClient:
             if category:
                 data["category"] = category
             if keywords:
-                data["keywords"] = ",".join(keywords) if isinstance(keywords, list) else keywords
+                data["keywords"] = (
+                    ",".join(keywords) if isinstance(keywords, list) else keywords
+                )
             try:
                 resp = self.session.post(url, files=files, data=data)
             except requests.ConnectionError:
@@ -635,8 +650,9 @@ class GeoNodeClient:
 
     def list_execution_requests(self, page=1, page_size=10):
         """List execution requests for current user."""
-        resp = self._get("executionrequest", params={
-            "page": page, "page_size": page_size})
+        resp = self._get(
+            "executionrequest", params={"page": page, "page_size": page_size}
+        )
         return resp.json()
 
     def get_execution_request(self, exec_id):
@@ -676,20 +692,24 @@ class GeoNodeClient:
 
     def get_harvestable_resources(self, harvester_pk, page=1, page_size=10):
         """Get harvestable resources for a harvester."""
-        resp = self._get(f"harvesters/{harvester_pk}/harvestable-resources",
-                         params={"page": page, "page_size": page_size})
+        resp = self._get(
+            f"harvesters/{harvester_pk}/harvestable-resources",
+            params={"page": page, "page_size": page_size},
+        )
         return resp.json()
 
     def update_harvestable_resources(self, harvester_pk, **data):
         """Update harvestable resources selection (PATCH)."""
-        resp = self._patch(f"harvesters/{harvester_pk}/harvestable-resources",
-                           json=data)
+        resp = self._patch(
+            f"harvesters/{harvester_pk}/harvestable-resources", json=data
+        )
         return resp.json()
 
     def list_harvesting_sessions(self, page=1, page_size=10):
         """List harvesting sessions."""
-        resp = self._get("harvesting-sessions", params={
-            "page": page, "page_size": page_size})
+        resp = self._get(
+            "harvesting-sessions", params={"page": page, "page_size": page_size}
+        )
         return resp.json()
 
     def get_harvesting_session(self, pk):
@@ -729,51 +749,59 @@ class GeoNodeClient:
 
     def autocomplete_users(self, query=""):
         """Autocomplete users for metadata."""
-        resp = self._get("metadata/autocomplete/users",
-                         params={"q": query} if query else {})
+        resp = self._get(
+            "metadata/autocomplete/users", params={"q": query} if query else {}
+        )
         return resp.json()
 
     def autocomplete_resources(self, query=""):
         """Autocomplete resources for metadata."""
-        resp = self._get("metadata/autocomplete/resources",
-                         params={"q": query} if query else {})
+        resp = self._get(
+            "metadata/autocomplete/resources", params={"q": query} if query else {}
+        )
         return resp.json()
 
     def autocomplete_regions(self, query=""):
         """Autocomplete regions for metadata."""
-        resp = self._get("metadata/autocomplete/regions",
-                         params={"q": query} if query else {})
+        resp = self._get(
+            "metadata/autocomplete/regions", params={"q": query} if query else {}
+        )
         return resp.json()
 
     def autocomplete_keywords(self, query=""):
         """Autocomplete hierarchical keywords for metadata."""
-        resp = self._get("metadata/autocomplete/hkeywords",
-                         params={"q": query} if query else {})
+        resp = self._get(
+            "metadata/autocomplete/hkeywords", params={"q": query} if query else {}
+        )
         return resp.json()
 
     def autocomplete_groups(self, query=""):
         """Autocomplete groups for metadata."""
-        resp = self._get("metadata/autocomplete/groups",
-                         params={"q": query} if query else {})
+        resp = self._get(
+            "metadata/autocomplete/groups", params={"q": query} if query else {}
+        )
         return resp.json()
 
     def autocomplete_categories(self, query=""):
         """Autocomplete categories for metadata."""
-        resp = self._get("metadata/autocomplete/categories",
-                         params={"q": query} if query else {})
+        resp = self._get(
+            "metadata/autocomplete/categories", params={"q": query} if query else {}
+        )
         return resp.json()
 
     def autocomplete_licenses(self, query=""):
         """Autocomplete licenses for metadata."""
-        resp = self._get("metadata/autocomplete/licenses",
-                         params={"q": query} if query else {})
+        resp = self._get(
+            "metadata/autocomplete/licenses", params={"q": query} if query else {}
+        )
         return resp.json()
 
     def autocomplete_thesaurus_keywords(self, thesaurus_id, query=""):
         """Autocomplete thesaurus keywords for metadata."""
         resp = self._get(
             f"metadata/autocomplete/thesaurus/{thesaurus_id}/keywords",
-            params={"q": query} if query else {})
+            params={"q": query} if query else {},
+        )
         return resp.json()
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -785,8 +813,15 @@ class GeoNodeClient:
         resp = self._get("facets")
         return resp.json()
 
-    def get_facet(self, facet_name, page=1, page_size=10, lang=None,
-                  topic_contains=None, **filters):
+    def get_facet(
+        self,
+        facet_name,
+        page=1,
+        page_size=10,
+        lang=None,
+        topic_contains=None,
+        **filters,
+    ):
         """Get facet details with topics/options."""
         params = {"page": page, "page_size": page_size, **filters}
         if lang:
@@ -826,8 +861,7 @@ class GeoNodeClient:
 
     def list_thesaurus_keywords(self, page=1, page_size=50):
         """List thesaurus keywords."""
-        resp = self._get("tkeywords", params={
-            "page": page, "page_size": page_size})
+        resp = self._get("tkeywords", params={"page": page, "page_size": page_size})
         return resp.json()
 
     def get_thesaurus_keyword(self, pk):

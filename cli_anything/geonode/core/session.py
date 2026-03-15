@@ -7,8 +7,14 @@ import time
 class Session:
     """Manages stateful CLI session with connection context and history."""
 
-    def __init__(self, url="http://localhost:8000", auth_type="token",
-                 token=None, username=None, password=None):
+    def __init__(
+        self,
+        url="http://localhost:8000",
+        auth_type="token",
+        token=None,
+        username=None,
+        password=None,
+    ):
         self.url = url
         self.auth_type = auth_type
         self.token = token

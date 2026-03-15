@@ -42,10 +42,24 @@ def format_document_list(data):
 def format_resource_detail(data):
     """Print resource detail as key-value pairs."""
     fields = [
-        "pk", "title", "abstract", "owner", "resource_type", "date",
-        "date_type", "edition", "purpose", "category", "regions",
-        "keywords", "bbox_polygon", "srid", "is_published", "is_approved",
-        "detail_url", "thumbnail_url",
+        "pk",
+        "title",
+        "abstract",
+        "owner",
+        "resource_type",
+        "date",
+        "date_type",
+        "edition",
+        "purpose",
+        "category",
+        "regions",
+        "keywords",
+        "bbox_polygon",
+        "srid",
+        "is_published",
+        "is_approved",
+        "detail_url",
+        "thumbnail_url",
     ]
     for key in fields:
         if key in data:
@@ -53,7 +67,9 @@ def format_resource_detail(data):
             if isinstance(val, dict):
                 val = val.get("username", val.get("identifier", str(val)))
             elif isinstance(val, list):
-                val = ", ".join(str(v.get("name", v) if isinstance(v, dict) else v) for v in val[:5])
+                val = ", ".join(
+                    str(v.get("name", v) if isinstance(v, dict) else v) for v in val[:5]
+                )
                 if len(data[key]) > 5:
                     val += f" ... ({len(data[key])} total)"
             click.echo(f"  {key:<20} {val}")

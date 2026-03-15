@@ -1,28 +1,43 @@
 """GeoNode CLI — command-line interface for GeoNode geospatial CMS."""
 
 import json as json_mod
-import os
 import shlex
 
 import click
 
 from cli_anything.geonode.core.client import GeoNodeClient, GeoNodeError
 from cli_anything.geonode.core.config import (
-    load_config, save_config, set_url, set_token, set_credentials,
-    show_config, clear_config,
+    load_config,
+    set_url,
+    set_token,
+    set_credentials,
+    show_config,
+    clear_config,
 )
 from cli_anything.geonode.core.session import Session
 from cli_anything.geonode.utils.formatters import (
-    format_dataset_list, format_map_list, format_document_list,
-    format_resource_list, format_resource_detail, format_user_list,
-    format_group_list, format_permissions, format_upload_list,
-    format_config, format_geoapp_list, format_harvester_list,
-    format_execution_list, format_facet_list, format_category_list,
-    format_region_list, format_keyword_list,
+    format_dataset_list,
+    format_map_list,
+    format_document_list,
+    format_resource_list,
+    format_resource_detail,
+    format_user_list,
+    format_group_list,
+    format_permissions,
+    format_upload_list,
+    format_config,
+    format_geoapp_list,
+    format_harvester_list,
+    format_execution_list,
+    format_facet_list,
+    format_category_list,
+    format_region_list,
+    format_keyword_list,
 )
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
+
 
 def _output(ctx, data, human_fn=None):
     """Output data as JSON or human-readable."""
@@ -42,10 +57,15 @@ def _get_client(ctx):
 def _handle_error(ctx, e):
     """Handle GeoNodeError."""
     if ctx.obj.get("json_mode"):
-        click.echo(json_mod.dumps({
-            "error": str(e),
-            "status_code": getattr(e, "status_code", None),
-        }), err=True)
+        click.echo(
+            json_mod.dumps(
+                {
+                    "error": str(e),
+                    "status_code": getattr(e, "status_code", None),
+                }
+            ),
+            err=True,
+        )
     else:
         click.echo(f"Error: {e}", err=True)
         if hasattr(e, "response_text") and e.response_text:
@@ -55,11 +75,12 @@ def _handle_error(ctx, e):
 
 # ── Main CLI Group ───────────────────────────────────────────────────────
 
+
 @click.group(invoke_without_command=True)
-@click.option("--url", envvar="GEONODE_URL", default=None,
-              help="GeoNode instance URL")
-@click.option("--token", envvar="GEONODE_TOKEN", default=None,
-              help="API key / OAuth token")
+@click.option("--url", envvar="GEONODE_URL", default=None, help="GeoNode instance URL")
+@click.option(
+    "--token", envvar="GEONODE_TOKEN", default=None, help="API key / OAuth token"
+)
 @click.option("--user", envvar="GEONODE_USER", default=None, help="Username")
 @click.option("--password", envvar="GEONODE_PASSWORD", default=None, help="Password")
 @click.option("--json", "json_mode", is_flag=True, help="Output as JSON")
@@ -81,18 +102,25 @@ def cli(ctx, url, token, user, password, json_mode, page_size):
     user = user or config.get("username")
     password = password or config.get("password")
 
-    ctx.obj["client"] = GeoNodeClient(url=url, token=token,
-                                       username=user, password=password)
+    ctx.obj["client"] = GeoNodeClient(
+        url=url, token=token, username=user, password=password
+    )
     ctx.obj["json_mode"] = json_mode
     ctx.obj["page_size"] = page_size
-    ctx.obj["session"] = Session(url=url, auth_type="token" if token else "basic",
-                                  token=token, username=user, password=password)
+    ctx.obj["session"] = Session(
+        url=url,
+        auth_type="token" if token else "basic",
+        token=token,
+        username=user,
+        password=password,
+    )
 
     if ctx.invoked_subcommand is None:
         ctx.invoke(repl)
 
 
 # ── REPL ─────────────────────────────────────────────────────────────────
+
 
 @cli.command(hidden=True)
 @click.pass_context
@@ -176,6 +204,7 @@ def repl(ctx):
 
 # ── Config Commands ──────────────────────────────────────────────────────
 
+
 @cli.group("config")
 @click.pass_context
 def config_group(ctx):
@@ -226,8 +255,11 @@ def config_test(ctx):
     try:
         client = _get_client(ctx)
         result = client.test_connection()
-        _output(ctx, {"status": "ok", "url": client.base_url, "response": result},
-                lambda d: click.echo(f"Connected to GeoNode at {d['url']}"))
+        _output(
+            ctx,
+            {"status": "ok", "url": client.base_url, "response": result},
+            lambda d: click.echo(f"Connected to GeoNode at {d['url']}"),
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -241,6 +273,7 @@ def config_clear(ctx):
 
 
 # ── Dataset Commands ─────────────────────────────────────────────────────
+
 
 @cli.group()
 @click.pass_context
@@ -269,8 +302,9 @@ def dataset_list(ctx, owner, category, keyword, query, page):
             filters["filter{keywords.slug__in}"] = keyword
         if query:
             filters["search"] = query
-        data = client.list_datasets(page=page,
-                                     page_size=ctx.obj["page_size"], **filters)
+        data = client.list_datasets(
+            page=page, page_size=ctx.obj["page_size"], **filters
+        )
         _output(ctx, data, format_dataset_list)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -301,10 +335,20 @@ def dataset_upload(ctx, file_path, title, abstract, category, keyword):
     try:
         client = _get_client(ctx)
         keywords = list(keyword) if keyword else None
-        data = client.upload_dataset(file_path, title=title, abstract=abstract,
-                                      category=category, keywords=keywords)
-        _output(ctx, data, lambda d: click.echo(
-            f"Upload started: {json_mod.dumps(d, indent=2, default=str)}"))
+        data = client.upload_dataset(
+            file_path,
+            title=title,
+            abstract=abstract,
+            category=category,
+            keywords=keywords,
+        )
+        _output(
+            ctx,
+            data,
+            lambda d: click.echo(
+                f"Upload started: {json_mod.dumps(d, indent=2, default=str)}"
+            ),
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -359,7 +403,11 @@ def dataset_permissions(ctx, pk, set_json):
         if set_json:
             perms = json_mod.loads(set_json)
             data = client.set_dataset_permissions(pk, perms)
-            _output(ctx, data, lambda d: click.echo(f"Permissions updated for dataset {pk}."))
+            _output(
+                ctx,
+                data,
+                lambda d: click.echo(f"Permissions updated for dataset {pk}."),
+            )
         else:
             data = client.get_dataset_permissions(pk)
             _output(ctx, data, format_permissions)
@@ -409,6 +457,7 @@ def dataset_maps(ctx, pk):
 
 # ── Map Commands ─────────────────────────────────────────────────────────
 
+
 @cli.group("map")
 @click.pass_context
 def map_group(ctx):
@@ -427,8 +476,7 @@ def map_list(ctx, query, page):
         filters = {}
         if query:
             filters["search"] = query
-        data = client.list_maps(page=page,
-                                 page_size=ctx.obj["page_size"], **filters)
+        data = client.list_maps(page=page, page_size=ctx.obj["page_size"], **filters)
         _output(ctx, data, format_map_list)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -459,8 +507,11 @@ def map_create(ctx, title, abstract):
         if abstract:
             payload["abstract"] = abstract
         data = client.create_map(**payload)
-        _output(ctx, data, lambda d: click.echo(
-            f"Map created: {d.get('pk', d.get('id', 'unknown'))}"))
+        _output(
+            ctx,
+            data,
+            lambda d: click.echo(f"Map created: {d.get('pk', d.get('id', 'unknown'))}"),
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -532,6 +583,7 @@ def map_datasets(ctx, pk):
 
 # ── Document Commands ────────────────────────────────────────────────────
 
+
 @cli.group()
 @click.pass_context
 def document(ctx):
@@ -550,8 +602,9 @@ def document_list(ctx, query, page):
         filters = {}
         if query:
             filters["search"] = query
-        data = client.list_documents(page=page,
-                                      page_size=ctx.obj["page_size"], **filters)
+        data = client.list_documents(
+            page=page, page_size=ctx.obj["page_size"], **filters
+        )
         _output(ctx, data, format_document_list)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -580,8 +633,13 @@ def document_upload(ctx, file_path, title, abstract):
     try:
         client = _get_client(ctx)
         data = client.upload_document(file_path, title=title, abstract=abstract)
-        _output(ctx, data, lambda d: click.echo(
-            f"Document uploaded: {d.get('pk', d.get('id', 'unknown'))}"))
+        _output(
+            ctx,
+            data,
+            lambda d: click.echo(
+                f"Document uploaded: {d.get('pk', d.get('id', 'unknown'))}"
+            ),
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -640,6 +698,7 @@ def document_linked(ctx, pk):
 
 # ── Resource Commands ────────────────────────────────────────────────────
 
+
 @cli.group()
 @click.pass_context
 def resource(ctx):
@@ -648,8 +707,12 @@ def resource(ctx):
 
 
 @resource.command("list")
-@click.option("--type", "resource_type", default=None,
-              help="Filter by type (dataset, map, document)")
+@click.option(
+    "--type",
+    "resource_type",
+    default=None,
+    help="Filter by type (dataset, map, document)",
+)
 @click.option("--search", "query", default=None, help="Full-text search")
 @click.option("--page", type=int, default=1, help="Page number")
 @click.pass_context
@@ -662,8 +725,9 @@ def resource_list(ctx, resource_type, query, page):
             filters["filter{resource_type__in}"] = resource_type
         if query:
             filters["search"] = query
-        data = client.list_resources(page=page,
-                                      page_size=ctx.obj["page_size"], **filters)
+        data = client.list_resources(
+            page=page, page_size=ctx.obj["page_size"], **filters
+        )
         _output(ctx, data, format_resource_list)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -677,8 +741,7 @@ def resource_search(ctx, query, page):
     """Search resources by text query."""
     try:
         client = _get_client(ctx)
-        data = client.search_resources(query, page=page,
-                                        page_size=ctx.obj["page_size"])
+        data = client.search_resources(query, page=page, page_size=ctx.obj["page_size"])
         _output(ctx, data, format_resource_list)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -708,7 +771,11 @@ def resource_permissions(ctx, pk, set_json):
         if set_json:
             perms = json_mod.loads(set_json)
             data = client.set_resource_permissions(pk, perms)
-            _output(ctx, data, lambda d: click.echo(f"Permissions updated for resource {pk}."))
+            _output(
+                ctx,
+                data,
+                lambda d: click.echo(f"Permissions updated for resource {pk}."),
+            )
         else:
             data = client.get_resource_permissions(pk)
             _output(ctx, data, format_permissions)
@@ -724,8 +791,13 @@ def resource_copy(ctx, pk):
     try:
         client = _get_client(ctx)
         data = client.copy_resource(pk)
-        _output(ctx, data, lambda d: click.echo(
-            f"Resource {pk} copied: {d.get('pk', d.get('id', 'unknown'))}"))
+        _output(
+            ctx,
+            data,
+            lambda d: click.echo(
+                f"Resource {pk} copied: {d.get('pk', d.get('id', 'unknown'))}"
+            ),
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -766,7 +838,9 @@ def resource_published(ctx, page):
     """List published resources."""
     try:
         client = _get_client(ctx)
-        data = client.list_published_resources(page=page, page_size=ctx.obj["page_size"])
+        data = client.list_published_resources(
+            page=page, page_size=ctx.obj["page_size"]
+        )
         _output(ctx, data, format_resource_list)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -808,10 +882,16 @@ def resource_favorite(ctx, pk, remove):
         client = _get_client(ctx)
         if remove:
             data = client.remove_favorite(pk)
-            _output(ctx, data, lambda d: click.echo(f"Resource {pk} removed from favorites."))
+            _output(
+                ctx,
+                data,
+                lambda d: click.echo(f"Resource {pk} removed from favorites."),
+            )
         else:
             data = client.add_favorite(pk)
-            _output(ctx, data, lambda d: click.echo(f"Resource {pk} added to favorites."))
+            _output(
+                ctx, data, lambda d: click.echo(f"Resource {pk} added to favorites.")
+            )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -830,7 +910,9 @@ def resource_types(ctx):
 
 @resource.command("set-thumbnail")
 @click.argument("pk", type=int)
-@click.option("--file", "file_path", type=click.Path(exists=True), help="Thumbnail image file")
+@click.option(
+    "--file", "file_path", type=click.Path(exists=True), help="Thumbnail image file"
+)
 @click.option("--url", "thumb_url", default=None, help="Thumbnail URL")
 @click.pass_context
 def resource_set_thumbnail(ctx, pk, file_path, thumb_url):
@@ -854,11 +936,19 @@ def resource_extra_metadata(ctx, pk, set_json, do_delete):
         client = _get_client(ctx)
         if do_delete:
             data = client.delete_extra_metadata(pk)
-            _output(ctx, data, lambda d: click.echo(f"Extra metadata deleted for resource {pk}."))
+            _output(
+                ctx,
+                data,
+                lambda d: click.echo(f"Extra metadata deleted for resource {pk}."),
+            )
         elif set_json:
             metadata = json_mod.loads(set_json)
             data = client.update_extra_metadata(pk, metadata)
-            _output(ctx, data, lambda d: click.echo(f"Extra metadata updated for resource {pk}."))
+            _output(
+                ctx,
+                data,
+                lambda d: click.echo(f"Extra metadata updated for resource {pk}."),
+            )
         else:
             data = client.get_extra_metadata(pk)
             _output(ctx, data)
@@ -881,8 +971,15 @@ def resource_iso_metadata(ctx, pk):
 
 @resource.command("linked-resources")
 @click.argument("pk", type=int)
-@click.option("--add", "add_pks", default=None, help="Add linked resources (comma-separated PKs)")
-@click.option("--remove", "remove_pks", default=None, help="Remove linked resources (comma-separated PKs)")
+@click.option(
+    "--add", "add_pks", default=None, help="Add linked resources (comma-separated PKs)"
+)
+@click.option(
+    "--remove",
+    "remove_pks",
+    default=None,
+    help="Remove linked resources (comma-separated PKs)",
+)
 @click.pass_context
 def resource_linked(ctx, pk, add_pks, remove_pks):
     """View, add, or remove linked resources."""
@@ -895,7 +992,9 @@ def resource_linked(ctx, pk, add_pks, remove_pks):
         elif remove_pks:
             pks = [int(x.strip()) for x in remove_pks.split(",")]
             data = client.remove_linked_resources(pk, pks)
-            _output(ctx, data, lambda d: click.echo(f"Linked resources removed from {pk}."))
+            _output(
+                ctx, data, lambda d: click.echo(f"Linked resources removed from {pk}.")
+            )
         else:
             data = client.get_linked_resources(pk)
             _output(ctx, data)
@@ -912,8 +1011,7 @@ def resource_upload_asset(ctx, pk, file_path):
     try:
         client = _get_client(ctx)
         data = client.upload_asset(pk, file_path)
-        _output(ctx, data, lambda d: click.echo(
-            f"Asset uploaded for resource {pk}."))
+        _output(ctx, data, lambda d: click.echo(f"Asset uploaded for resource {pk}."))
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -927,12 +1025,17 @@ def resource_delete_asset(ctx, pk, asset_id):
     try:
         client = _get_client(ctx)
         data = client.delete_asset(pk, asset_id)
-        _output(ctx, data, lambda d: click.echo(f"Asset {asset_id} deleted from resource {pk}."))
+        _output(
+            ctx,
+            data,
+            lambda d: click.echo(f"Asset {asset_id} deleted from resource {pk}."),
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
 
 # ── GeoApp Commands ──────────────────────────────────────────────────────
+
 
 @cli.group()
 @click.pass_context
@@ -952,8 +1055,7 @@ def geoapp_list(ctx, query, page):
         filters = {}
         if query:
             filters["search"] = query
-        data = client.list_geoapps(page=page,
-                                    page_size=ctx.obj["page_size"], **filters)
+        data = client.list_geoapps(page=page, page_size=ctx.obj["page_size"], **filters)
         _output(ctx, data, format_geoapp_list)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -984,8 +1086,13 @@ def geoapp_create(ctx, title, abstract):
         if abstract:
             payload["abstract"] = abstract
         data = client.create_geoapp(**payload)
-        _output(ctx, data, lambda d: click.echo(
-            f"GeoApp created: {d.get('pk', d.get('id', 'unknown'))}"))
+        _output(
+            ctx,
+            data,
+            lambda d: click.echo(
+                f"GeoApp created: {d.get('pk', d.get('id', 'unknown'))}"
+            ),
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -1030,6 +1137,7 @@ def geoapp_delete(ctx, pk, confirm):
 
 
 # ── User Commands ────────────────────────────────────────────────────────
+
 
 @cli.group()
 @click.pass_context
@@ -1142,6 +1250,7 @@ def user_me(ctx):
 
 # ── Group Commands ───────────────────────────────────────────────────────
 
+
 @cli.group()
 @click.pass_context
 def group(ctx):
@@ -1216,6 +1325,7 @@ def group_managers(ctx, pk):
 
 # ── Upload Commands ──────────────────────────────────────────────────────
 
+
 @cli.group()
 @click.pass_context
 def upload(ctx):
@@ -1288,6 +1398,7 @@ def upload_imports(ctx, page):
 
 # ── Execution Request Commands ───────────────────────────────────────────
 
+
 @cli.group("execution")
 @click.pass_context
 def execution_group(ctx):
@@ -1342,12 +1453,15 @@ def execution_delete(ctx, exec_id):
     try:
         client = _get_client(ctx)
         data = client.delete_execution_request(exec_id)
-        _output(ctx, data, lambda d: click.echo(f"Execution request {exec_id} deleted."))
+        _output(
+            ctx, data, lambda d: click.echo(f"Execution request {exec_id} deleted.")
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
 
 # ── Harvester Commands ───────────────────────────────────────────────────
+
 
 @cli.group()
 @click.pass_context
@@ -1395,8 +1509,13 @@ def harvester_create(ctx, name, remote_url, harvester_type):
         if harvester_type:
             payload["harvester_type"] = harvester_type
         data = client.create_harvester(**payload)
-        _output(ctx, data, lambda d: click.echo(
-            f"Harvester created: {d.get('pk', d.get('id', 'unknown'))}"))
+        _output(
+            ctx,
+            data,
+            lambda d: click.echo(
+                f"Harvester created: {d.get('pk', d.get('id', 'unknown'))}"
+            ),
+        )
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
@@ -1432,7 +1551,9 @@ def harvester_resources(ctx, pk, page):
     """List harvestable resources for a harvester."""
     try:
         client = _get_client(ctx)
-        data = client.get_harvestable_resources(pk, page=page, page_size=ctx.obj["page_size"])
+        data = client.get_harvestable_resources(
+            pk, page=page, page_size=ctx.obj["page_size"]
+        )
         _output(ctx, data)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -1445,7 +1566,9 @@ def harvester_sessions(ctx, page):
     """List harvesting sessions."""
     try:
         client = _get_client(ctx)
-        data = client.list_harvesting_sessions(page=page, page_size=ctx.obj["page_size"])
+        data = client.list_harvesting_sessions(
+            page=page, page_size=ctx.obj["page_size"]
+        )
         _output(ctx, data)
     except GeoNodeError as e:
         _handle_error(ctx, e)
@@ -1465,6 +1588,7 @@ def harvester_session_info(ctx, pk):
 
 
 # ── Metadata Commands ────────────────────────────────────────────────────
+
 
 @cli.group()
 @click.pass_context
@@ -1509,7 +1633,9 @@ def metadata_instance(ctx, pk, set_json):
         if set_json:
             data_in = json_mod.loads(set_json)
             data = client.update_metadata_instance(pk, **data_in)
-            _output(ctx, data, lambda d: click.echo(f"Metadata updated for resource {pk}."))
+            _output(
+                ctx, data, lambda d: click.echo(f"Metadata updated for resource {pk}.")
+            )
         else:
             data = client.get_metadata_instance(pk)
             _output(ctx, data)
@@ -1518,9 +1644,20 @@ def metadata_instance(ctx, pk, set_json):
 
 
 @metadata.command("autocomplete")
-@click.argument("entity", type=click.Choice([
-    "users", "resources", "regions", "hkeywords",
-    "groups", "categories", "licenses"]))
+@click.argument(
+    "entity",
+    type=click.Choice(
+        [
+            "users",
+            "resources",
+            "regions",
+            "hkeywords",
+            "groups",
+            "categories",
+            "licenses",
+        ]
+    ),
+)
 @click.option("--query", "-q", default="", help="Search query")
 @click.pass_context
 def metadata_autocomplete(ctx, entity, query):
@@ -1543,6 +1680,7 @@ def metadata_autocomplete(ctx, entity, query):
 
 
 # ── Facet Commands ───────────────────────────────────────────────────────
+
 
 @cli.group()
 @click.pass_context
@@ -1573,14 +1711,20 @@ def facet_get(ctx, name, page, lang, topic_contains):
     """Get facet details with topics."""
     try:
         client = _get_client(ctx)
-        data = client.get_facet(name, page=page, page_size=ctx.obj["page_size"],
-                                 lang=lang, topic_contains=topic_contains)
+        data = client.get_facet(
+            name,
+            page=page,
+            page_size=ctx.obj["page_size"],
+            lang=lang,
+            topic_contains=topic_contains,
+        )
         _output(ctx, data)
     except GeoNodeError as e:
         _handle_error(ctx, e)
 
 
 # ── Category Commands ────────────────────────────────────────────────────
+
 
 @cli.group()
 @click.pass_context
@@ -1616,6 +1760,7 @@ def category_info(ctx, pk):
 
 # ── Region Commands ──────────────────────────────────────────────────────
 
+
 @cli.group()
 @click.pass_context
 def region(ctx):
@@ -1650,6 +1795,7 @@ def region_info(ctx, pk):
 
 
 # ── Keyword Commands ─────────────────────────────────────────────────────
+
 
 @cli.group()
 @click.pass_context
@@ -1712,6 +1858,7 @@ def keyword_thesaurus_info(ctx, pk):
 
 # ── Owner Commands ───────────────────────────────────────────────────────
 
+
 @cli.group()
 @click.pass_context
 def owner(ctx):
@@ -1747,6 +1894,7 @@ def owner_info(ctx, pk):
 
 # ── Schema Command ───────────────────────────────────────────────────────
 
+
 @cli.command("schema")
 @click.pass_context
 def schema_cmd(ctx):
@@ -1760,6 +1908,7 @@ def schema_cmd(ctx):
 
 
 # ── Entry point ──────────────────────────────────────────────────────────
+
 
 def main():
     cli(auto_envvar_prefix="GEONODE")

@@ -10,8 +10,12 @@ import pytest
 from click.testing import CliRunner
 
 from cli_anything.geonode.core.config import (
-    load_config, save_config, set_url, set_token, set_credentials,
-    show_config, CONFIG_FILE,
+    load_config,
+    save_config,
+    set_url,
+    set_token,
+    set_credentials,
+    show_config,
 )
 from cli_anything.geonode.core.session import Session
 from cli_anything.geonode.core.client import GeoNodeClient, GeoNodeError
@@ -19,6 +23,7 @@ from cli_anything.geonode.geonode_cli import cli
 
 
 # ── Shared mock helpers ──────────────────────────────────────────────────
+
 
 def _mock_response(status=200, json_data=None):
     mock = MagicMock()
@@ -35,9 +40,12 @@ def _make_client():
 
 # ── TestConfig ───────────────────────────────────────────────────────────
 
+
 class TestConfig:
     def test_load_default_config(self, tmp_path):
-        with patch("cli_anything.geonode.core.config.CONFIG_FILE", tmp_path / "nope.json"):
+        with patch(
+            "cli_anything.geonode.core.config.CONFIG_FILE", tmp_path / "nope.json"
+        ):
             config = load_config()
         assert config["url"] == "http://localhost:8000"
         assert config["auth_type"] == "token"
@@ -45,49 +53,74 @@ class TestConfig:
 
     def test_save_and_load_config(self, tmp_path):
         cfg_file = tmp_path / "config.json"
-        with patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file), \
-             patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path):
-            save_config({"url": "http://example.com", "token": "abc123",
-                         "auth_type": "token", "username": None, "password": None})
+        with (
+            patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file),
+            patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path),
+        ):
+            save_config(
+                {
+                    "url": "http://example.com",
+                    "token": "abc123",
+                    "auth_type": "token",
+                    "username": None,
+                    "password": None,
+                }
+            )
             loaded = load_config()
         assert loaded["url"] == "http://example.com"
         assert loaded["token"] == "abc123"
 
     def test_set_url(self, tmp_path):
         cfg_file = tmp_path / "config.json"
-        with patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file), \
-             patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path):
+        with (
+            patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file),
+            patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path),
+        ):
             result = set_url("http://geonode.example.com/")
         assert result["url"] == "http://geonode.example.com"
 
     def test_set_token(self, tmp_path):
         cfg_file = tmp_path / "config.json"
-        with patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file), \
-             patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path):
+        with (
+            patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file),
+            patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path),
+        ):
             result = set_token("my-secret-token-1234567890")
         assert result["token"] == "my-secret-token-1234567890"
         assert result["auth_type"] == "token"
 
     def test_show_config_masks_secrets(self, tmp_path):
         cfg_file = tmp_path / "config.json"
-        with patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file), \
-             patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path):
-            save_config({"url": "http://x.com", "token": "abcdefghijklmnopqrstuvwxyz",
-                         "auth_type": "token", "username": "admin", "password": "secret"})
+        with (
+            patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file),
+            patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path),
+        ):
+            save_config(
+                {
+                    "url": "http://x.com",
+                    "token": "abcdefghijklmnopqrstuvwxyz",
+                    "auth_type": "token",
+                    "username": "admin",
+                    "password": "secret",
+                }
+            )
             display = show_config()
         assert display["password"] == "***"
         assert "..." in display["token"]
 
     def test_set_credentials(self, tmp_path):
         cfg_file = tmp_path / "config.json"
-        with patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file), \
-             patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path):
+        with (
+            patch("cli_anything.geonode.core.config.CONFIG_FILE", cfg_file),
+            patch("cli_anything.geonode.core.config.CONFIG_DIR", tmp_path),
+        ):
             result = set_credentials("admin", "geonode")
         assert result["username"] == "admin"
         assert result["auth_type"] == "basic"
 
 
 # ── TestSession ──────────────────────────────────────────────────────────
+
 
 class TestSession:
     def test_create_session(self):
@@ -127,6 +160,7 @@ class TestSession:
 
 # ── TestGeoNodeClient ────────────────────────────────────────────────────
 
+
 class TestGeoNodeClient:
     def test_url_construction(self):
         c = GeoNodeClient(url="http://geo.test")
@@ -158,16 +192,18 @@ class TestGeoNodeClient:
 
     def test_list_datasets_mocked(self):
         c = _make_client()
-        resp = _mock_response(json_data={
-            "datasets": [{"pk": 1, "title": "Test"}], "total": 1})
+        resp = _mock_response(
+            json_data={"datasets": [{"pk": 1, "title": "Test"}], "total": 1}
+        )
         with patch.object(c.session, "request", return_value=resp):
             data = c.list_datasets()
         assert data["total"] == 1
         assert data["datasets"][0]["pk"] == 1
 
     def test_env_var_defaults(self):
-        with patch.dict(os.environ, {"GEONODE_URL": "http://env.test",
-                                      "GEONODE_TOKEN": "env-tok"}):
+        with patch.dict(
+            os.environ, {"GEONODE_URL": "http://env.test", "GEONODE_TOKEN": "env-tok"}
+        ):
             c = GeoNodeClient()
         assert c.base_url == "http://env.test"
         assert c.token == "env-tok"
@@ -175,19 +211,25 @@ class TestGeoNodeClient:
 
 # ── TestDatasetOperations ────────────────────────────────────────────────
 
+
 class TestDatasetOperations:
     def setup_method(self):
         self.client = _make_client()
 
     def test_list_datasets(self):
-        resp = _mock_response(json_data={"datasets": [{"pk": 1}, {"pk": 2}], "total": 2})
+        resp = _mock_response(
+            json_data={"datasets": [{"pk": 1}, {"pk": 2}], "total": 2}
+        )
         with patch.object(self.client.session, "request", return_value=resp):
             data = self.client.list_datasets()
         assert len(data["datasets"]) == 2
 
     def test_get_dataset(self):
-        resp = _mock_response(json_data={
-            "dataset": {"pk": 1, "title": "Rivers", "owner": {"username": "admin"}}})
+        resp = _mock_response(
+            json_data={
+                "dataset": {"pk": 1, "title": "Rivers", "owner": {"username": "admin"}}
+            }
+        )
         with patch.object(self.client.session, "request", return_value=resp):
             data = self.client.get_dataset(1)
         assert data["title"] == "Rivers"
@@ -219,7 +261,9 @@ class TestDatasetOperations:
     def test_set_dataset_permissions(self):
         resp = _mock_response(json_data={"status": "ok"})
         with patch.object(self.client.session, "request", return_value=resp):
-            data = self.client.set_dataset_permissions(1, {"users": {"admin": ["view"]}})
+            data = self.client.set_dataset_permissions(
+                1, {"users": {"admin": ["view"]}}
+            )
         assert data["status"] == "ok"
 
     def test_get_dataset_maplayers(self):
@@ -244,6 +288,7 @@ class TestDatasetOperations:
 
 
 # ── TestMapOperations ────────────────────────────────────────────────────
+
 
 class TestMapOperations:
     def setup_method(self):
@@ -294,6 +339,7 @@ class TestMapOperations:
 
 # ── TestDocumentOperations ───────────────────────────────────────────────
 
+
 class TestDocumentOperations:
     def setup_method(self):
         self.client = _make_client()
@@ -333,6 +379,7 @@ class TestDocumentOperations:
 
 # ── TestGeoAppOperations ─────────────────────────────────────────────────
 
+
 class TestGeoAppOperations:
     def setup_method(self):
         self.client = _make_client()
@@ -363,6 +410,7 @@ class TestGeoAppOperations:
 
 
 # ── TestResourceOperations ───────────────────────────────────────────────
+
 
 class TestResourceOperations:
     def setup_method(self):
@@ -453,7 +501,9 @@ class TestResourceOperations:
         assert data["unfavorited"] is True
 
     def test_get_resource_types(self):
-        resp = _mock_response(json_data={"resource_types": [{"name": "dataset", "count": 5}]})
+        resp = _mock_response(
+            json_data={"resource_types": [{"name": "dataset", "count": 5}]}
+        )
         with patch.object(self.client.session, "request", return_value=resp):
             data = self.client.get_resource_types()
         assert "resource_types" in data
@@ -545,12 +595,15 @@ class TestResourceOperations:
 
 # ── TestUserOperations ───────────────────────────────────────────────────
 
+
 class TestUserOperations:
     def setup_method(self):
         self.client = _make_client()
 
     def test_list_users(self):
-        resp = _mock_response(json_data={"users": [{"pk": 1, "username": "admin"}], "total": 1})
+        resp = _mock_response(
+            json_data={"users": [{"pk": 1, "username": "admin"}], "total": 1}
+        )
         with patch.object(self.client.session, "request", return_value=resp):
             data = self.client.list_users()
         assert data["total"] == 1
@@ -594,6 +647,7 @@ class TestUserOperations:
 
 # ── TestGroupOperations ──────────────────────────────────────────────────
 
+
 class TestGroupOperations:
     def setup_method(self):
         self.client = _make_client()
@@ -630,6 +684,7 @@ class TestGroupOperations:
 
 
 # ── TestUpload ───────────────────────────────────────────────────────────
+
 
 class TestUpload:
     def setup_method(self):
@@ -668,19 +723,24 @@ class TestUpload:
         assert "total" in data
 
     def test_get_upload_size_limits(self):
-        resp = _mock_response(json_data={"limits": [{"slug": "default", "max_size": 104857600}]})
+        resp = _mock_response(
+            json_data={"limits": [{"slug": "default", "max_size": 104857600}]}
+        )
         with patch.object(self.client.session, "request", return_value=resp):
             data = self.client.get_upload_size_limits()
         assert "limits" in data
 
     def test_get_upload_parallelism_limits(self):
-        resp = _mock_response(json_data={"limits": [{"slug": "default", "max_number": 5}]})
+        resp = _mock_response(
+            json_data={"limits": [{"slug": "default", "max_number": 5}]}
+        )
         with patch.object(self.client.session, "request", return_value=resp):
             data = self.client.get_upload_parallelism_limits()
         assert "limits" in data
 
 
 # ── TestExecutionRequests ────────────────────────────────────────────────
+
 
 class TestExecutionRequests:
     def setup_method(self):
@@ -713,6 +773,7 @@ class TestExecutionRequests:
 
 # ── TestHarvesters ───────────────────────────────────────────────────────
 
+
 class TestHarvesters:
     def setup_method(self):
         self.client = _make_client()
@@ -732,7 +793,9 @@ class TestHarvesters:
     def test_create_harvester(self):
         resp = _mock_response(json_data={"pk": 2, "name": "New"})
         with patch.object(self.client.session, "request", return_value=resp):
-            data = self.client.create_harvester(name="New", remote_url="http://wms.test")
+            data = self.client.create_harvester(
+                name="New", remote_url="http://wms.test"
+            )
         assert data["pk"] == 2
 
     def test_update_harvester(self):
@@ -761,6 +824,7 @@ class TestHarvesters:
 
 
 # ── TestMetadata ─────────────────────────────────────────────────────────
+
 
 class TestMetadata:
     def setup_method(self):
@@ -811,6 +875,7 @@ class TestMetadata:
 
 # ── TestFacets ───────────────────────────────────────────────────────────
 
+
 class TestFacets:
     def setup_method(self):
         self.client = _make_client()
@@ -822,8 +887,9 @@ class TestFacets:
         assert "facets" in data
 
     def test_get_facet(self):
-        resp = _mock_response(json_data={
-            "name": "category", "topics": [{"key": "env", "count": 5}]})
+        resp = _mock_response(
+            json_data={"name": "category", "topics": [{"key": "env", "count": 5}]}
+        )
         with patch.object(self.client.session, "request", return_value=resp):
             data = self.client.get_facet("category")
         assert data["name"] == "category"
@@ -831,13 +897,15 @@ class TestFacets:
 
 # ── TestCatalogEndpoints ────────────────────────────────────────────────
 
+
 class TestCatalogEndpoints:
     def setup_method(self):
         self.client = _make_client()
 
     def test_list_categories(self):
-        resp = _mock_response(json_data={
-            "categories": [{"pk": 1, "identifier": "environment"}]})
+        resp = _mock_response(
+            json_data={"categories": [{"pk": 1, "identifier": "environment"}]}
+        )
         with patch.object(self.client.session, "request", return_value=resp):
             data = self.client.list_categories()
         assert len(data["categories"]) == 1
@@ -911,6 +979,7 @@ class TestCatalogEndpoints:
 
 # ── TestCLI ──────────────────────────────────────────────────────────────
 
+
 class TestCLI:
     def test_help(self):
         runner = CliRunner()
@@ -933,19 +1002,41 @@ class TestCLI:
 
     def test_dataset_list_json_connection_error(self):
         runner = CliRunner()
-        result = runner.invoke(cli, [
-            "--url", "http://localhost:19999",
-            "--json", "dataset", "list",
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "--url",
+                "http://localhost:19999",
+                "--json",
+                "dataset",
+                "list",
+            ],
+        )
         assert result.exit_code != 0 or "error" in result.output.lower()
 
     def test_all_command_groups_in_help(self):
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
-        for group in ["config", "dataset", "document", "geoapp", "resource",
-                       "user", "group", "upload", "execution", "harvester",
-                       "metadata", "facet", "category", "region", "keyword",
-                       "owner", "schema", "map"]:
+        for group in [
+            "config",
+            "dataset",
+            "document",
+            "geoapp",
+            "resource",
+            "user",
+            "group",
+            "upload",
+            "execution",
+            "harvester",
+            "metadata",
+            "facet",
+            "category",
+            "region",
+            "keyword",
+            "owner",
+            "schema",
+            "map",
+        ]:
             assert group in result.output, f"Missing command group: {group}"
 
     def test_geoapp_help(self):
@@ -959,9 +1050,19 @@ class TestCLI:
         runner = CliRunner()
         result = runner.invoke(cli, ["resource", "--help"])
         assert result.exit_code == 0
-        for cmd in ["approved", "published", "featured", "favorites",
-                     "favorite", "types", "set-thumbnail", "extra-metadata",
-                     "iso-metadata", "linked-resources", "upload-asset"]:
+        for cmd in [
+            "approved",
+            "published",
+            "featured",
+            "favorites",
+            "favorite",
+            "types",
+            "set-thumbnail",
+            "extra-metadata",
+            "iso-metadata",
+            "linked-resources",
+            "upload-asset",
+        ]:
             assert cmd in result.output, f"Missing resource command: {cmd}"
 
     def test_harvester_help(self):
@@ -999,9 +1100,11 @@ class TestCLI:
 
 # ── TestCLISubprocess ────────────────────────────────────────────────────
 
+
 def _resolve_cli(name):
     """Resolve installed CLI command; falls back to python -m for dev."""
     import shutil
+
     force = os.environ.get("CLI_ANYTHING_FORCE_INSTALLED", "").strip() == "1"
     path = shutil.which(name)
     if path:
@@ -1009,7 +1112,12 @@ def _resolve_cli(name):
         return [path]
     if force:
         raise RuntimeError(f"{name} not found in PATH. Install with: pip install -e .")
-    module = name.replace("cli-anything-", "cli_anything.") + "." + name.split("-")[-1] + "_cli"
+    module = (
+        name.replace("cli-anything-", "cli_anything.")
+        + "."
+        + name.split("-")[-1]
+        + "_cli"
+    )
     print(f"[_resolve_cli] Falling back to: {sys.executable} -m {module}")
     return [sys.executable, "-m", module]
 
@@ -1020,7 +1128,8 @@ class TestCLISubprocess:
     def _run(self, args, check=True):
         return subprocess.run(
             self.CLI_BASE + args,
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
             check=check,
         )
 
@@ -1043,8 +1152,17 @@ class TestCLISubprocess:
     def test_all_groups_in_help(self):
         result = self._run(["--help"])
         assert result.returncode == 0
-        for group in ["geoapp", "execution", "harvester", "metadata",
-                       "facet", "category", "region", "keyword", "owner"]:
+        for group in [
+            "geoapp",
+            "execution",
+            "harvester",
+            "metadata",
+            "facet",
+            "category",
+            "region",
+            "keyword",
+            "owner",
+        ]:
             assert group in result.stdout, f"Missing group: {group}"
 
     def test_geoapp_help_subprocess(self):

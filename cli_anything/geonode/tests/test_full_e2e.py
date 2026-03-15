@@ -13,7 +13,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 
 import pytest
 
@@ -21,6 +20,7 @@ from cli_anything.geonode.core.client import GeoNodeClient, GeoNodeError
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
+
 
 def _get_client():
     """Create client from environment."""
@@ -35,6 +35,7 @@ def _get_client():
 def _resolve_cli(name):
     """Resolve installed CLI command; falls back to python -m for dev."""
     import shutil
+
     force = os.environ.get("CLI_ANYTHING_FORCE_INSTALLED", "").strip() == "1"
     path = shutil.which(name)
     if path:
@@ -42,29 +43,37 @@ def _resolve_cli(name):
         return [path]
     if force:
         raise RuntimeError(f"{name} not found in PATH. Install with: pip install -e .")
-    module = name.replace("cli-anything-", "cli_anything.") + "." + name.split("-")[-1] + "_cli"
+    module = (
+        name.replace("cli-anything-", "cli_anything.")
+        + "."
+        + name.split("-")[-1]
+        + "_cli"
+    )
     print(f"[_resolve_cli] Falling back to: {sys.executable} -m {module}")
     return [sys.executable, "-m", module]
 
 
-SAMPLE_GEOJSON = json.dumps({
-    "type": "FeatureCollection",
-    "features": [
-        {
-            "type": "Feature",
-            "geometry": {"type": "Point", "coordinates": [139.6917, 35.6895]},
-            "properties": {"name": "Tokyo", "population": 13960000},
-        },
-        {
-            "type": "Feature",
-            "geometry": {"type": "Point", "coordinates": [135.5023, 34.6937]},
-            "properties": {"name": "Osaka", "population": 2753000},
-        },
-    ],
-})
+SAMPLE_GEOJSON = json.dumps(
+    {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [139.6917, 35.6895]},
+                "properties": {"name": "Tokyo", "population": 13960000},
+            },
+            {
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [135.5023, 34.6937]},
+                "properties": {"name": "Osaka", "population": 2753000},
+            },
+        ],
+    }
+)
 
 
 # ── TestConnection ───────────────────────────────────────────────────────
+
 
 class TestConnection:
     def test_connection(self):
@@ -76,6 +85,7 @@ class TestConnection:
 
 
 # ── TestDatasetCRUD ──────────────────────────────────────────────────────
+
 
 class TestDatasetCRUD:
     def test_list_datasets(self):
@@ -124,11 +134,14 @@ class TestDatasetCRUD:
             pytest.skip("No datasets available")
         pk = datasets[0].get("pk", datasets[0].get("id"))
         perms = client.get_dataset_permissions(pk)
-        print(f"\n  Permissions for dataset {pk}: {json.dumps(perms, indent=2, default=str)}")
+        print(
+            f"\n  Permissions for dataset {pk}: {json.dumps(perms, indent=2, default=str)}"
+        )
         assert perms is not None
 
 
 # ── TestMapCRUD ──────────────────────────────────────────────────────────
+
 
 class TestMapCRUD:
     def test_list_maps(self):
@@ -151,7 +164,10 @@ class TestMapCRUD:
 
         # Verify
         info = client.get_map(pk)
-        assert info.get("title") == "CLI Test Map" or info.get("map", {}).get("title") == "CLI Test Map"
+        assert (
+            info.get("title") == "CLI Test Map"
+            or info.get("map", {}).get("title") == "CLI Test Map"
+        )
 
         # Delete
         client.delete_map(pk)
@@ -159,6 +175,7 @@ class TestMapCRUD:
 
 
 # ── TestDocumentCRUD ─────────────────────────────────────────────────────
+
 
 class TestDocumentCRUD:
     def test_list_documents(self):
@@ -173,7 +190,9 @@ class TestDocumentCRUD:
         client = _get_client()
 
         doc_file = tmp_path / "test_doc.txt"
-        doc_file.write_text("This is a test document for cli-anything-geonode E2E testing.")
+        doc_file.write_text(
+            "This is a test document for cli-anything-geonode E2E testing."
+        )
 
         result = client.upload_document(
             str(doc_file),
@@ -189,6 +208,7 @@ class TestDocumentCRUD:
 
 
 # ── TestResourceSearch ───────────────────────────────────────────────────
+
 
 class TestResourceSearch:
     def test_list_resources(self):
@@ -207,6 +227,7 @@ class TestResourceSearch:
 
 # ── TestUserGroup ────────────────────────────────────────────────────────
 
+
 class TestUserGroup:
     def test_list_users(self):
         client = _get_client()
@@ -223,6 +244,7 @@ class TestUserGroup:
 
 
 # ── TestFullWorkflow ─────────────────────────────────────────────────────
+
 
 class TestFullWorkflow:
     def test_upload_search_cleanup(self, tmp_path):
@@ -251,6 +273,7 @@ class TestFullWorkflow:
 
 # ── TestCLISubprocessE2E ─────────────────────────────────────────────────
 
+
 class TestCLISubprocessE2E:
     CLI_BASE = _resolve_cli("cli-anything-geonode")
 
@@ -258,8 +281,10 @@ class TestCLISubprocessE2E:
         env = os.environ.copy()
         return subprocess.run(
             self.CLI_BASE + args,
-            capture_output=True, text=True,
-            check=check, env=env,
+            capture_output=True,
+            text=True,
+            check=check,
+            env=env,
         )
 
     def test_dataset_list_json(self):
