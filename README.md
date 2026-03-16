@@ -4,6 +4,8 @@
 
 GeoNode is an open-source geospatial content management system (CMS) built on Django, GeoDjango, GeoServer, and PostGIS. It enables organizations to share, discover, and manage geospatial data through a web interface.
 
+> **For end users:** If you use GeoNode from a web browser (uploading datasets, creating maps, managing permissions), see [USER_GUIDE.md](USER_GUIDE.md).
+
 ## Architecture
 
 - **Framework:** Django + GeoDjango + Django REST Framework (dynamic-rest)
