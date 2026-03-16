@@ -17,7 +17,19 @@ class GeoNodeError(Exception):
 
 
 class GeoNodeClient:
-    """Client for GeoNode REST API v2 — 100% endpoint coverage."""
+    """Client for GeoNode REST API v2 — 100% endpoint coverage.
+
+    Example::
+
+        # Using environment variables (GEONODE_URL, GEONODE_TOKEN)
+        client = GeoNodeClient()
+
+        # Explicit URL + token
+        client = GeoNodeClient(url="https://maps.eurac.edu", token="your-token")
+
+        # Basic auth
+        client = GeoNodeClient(url="http://localhost:8000", username="admin", password="admin")
+    """
 
     def __init__(self, url=None, token=None, username=None, password=None):
         self.base_url = (
@@ -78,6 +90,13 @@ class GeoNodeClient:
     def _delete(self, path, **kwargs):
         return self._request("DELETE", path, **kwargs)
 
+    @staticmethod
+    def _build_payload(explicit, extras):
+        """Merge explicit params (dropping None) with extras."""
+        payload = {k: v for k, v in explicit.items() if v is not None}
+        payload.update(extras)
+        return payload
+
     def _paginated_get(self, path, page_size=10, max_pages=100, **params):
         """Auto-paginate a DRF list endpoint, yielding all results."""
         params["page_size"] = page_size
@@ -112,33 +131,163 @@ class GeoNodeClient:
     # ═══════════════════════════════════════════════════════════════════════
 
     def list_datasets(self, page=1, page_size=10, **filters):
-        """List datasets with optional filters."""
+        """List datasets with optional filters.
+
+        Example::
+
+            # Basic listing
+            client.list_datasets()
+
+            # With filters
+            client.list_datasets(page=2, page_size=5, search="temperature")
+            client.list_datasets(category__identifier="environment")
+            client.list_datasets(owner__username="admin")
+        """
         params = {"page": page, "page_size": page_size, **filters}
         resp = self._get("datasets", params=params)
         return resp.json()
 
     def get_dataset(self, pk):
-        """Get dataset details by ID."""
+        """Get dataset details by ID.
+
+        Example::
+
+            dataset = client.get_dataset(42)
+            print(dataset["title"], dataset["alternate"])
+        """
         resp = self._get(f"datasets/{pk}")
         return resp.json().get("dataset", resp.json())
 
-    def update_dataset(self, pk, **data):
-        """Partial update dataset metadata (PATCH)."""
-        resp = self._patch(f"datasets/{pk}", json=data)
+    def update_dataset(
+        self,
+        pk,
+        *,
+        # Essential
+        title=None, abstract=None,
+        # Classification
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        # Dataset-specific
+        ptype=None, ows_url=None, has_elevation=None, has_time=None,
+        is_mosaic=None, elevation_regex=None, time_regex=None,
+        featureinfo_custom_template=None, data=None, metadata=None,
+        # Dates
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        # Description
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        # Spatial
+        srid=None, spatial_representation_type=None, extent=None,
+        # Publishing
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        # Misc
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        # Contact roles
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
+        """Partial update dataset metadata (PATCH).
+
+        Args:
+            title: Dataset title.
+            abstract: Dataset description.
+            ptype: Processing type (max 255 chars).
+            ows_url: OWS service URL for this layer (max 200 chars).
+            has_elevation: Whether dataset has elevation data.
+            has_time: Whether dataset has time dimension.
+            is_mosaic: Whether dataset is a mosaic.
+            elevation_regex: Regex for elevation extraction (max 128 chars).
+            featureinfo_custom_template: Custom GetFeatureInfo HTML template.
+            category: Category identifier string, e.g. "environment", "climatologyMeteorologyAtmosphere".
+            group: Group name or identifier.
+            keywords: Comma-separated string or list, e.g. "climate,water".
+            regions: Region codes, e.g. "ITA".
+            license: License identifier, e.g. "cc-by-4.0", "public_domain", "not_specified".
+            restriction_code_type: Access restriction, e.g. "otherRestrictions".
+            spatial_representation_type: e.g. "vector", "grid".
+            extent: Dict with "coords" [minx, miny, maxx, maxy] and "srid", e.g.
+                {"coords": [10.4, 46.2, 12.9, 47.2], "srid": "EPSG:4326"}.
+            srid: Native spatial reference, e.g. "EPSG:32632".
+            poc: Point of contact — list of user PKs.
+            metadata_author: Metadata author — list of user PKs.
+            maintenance_frequency: e.g. "asNeeded", "daily", "annually".
+            **kwargs: Additional fields forwarded to the API.
+
+        Example::
+
+            client.update_dataset(
+                42,
+                title="Updated Temperature Data",
+                abstract="Daily temperature readings for Bolzano 2024",
+                keywords="climate,temperature,bolzano",
+                category="climatologyMeteorologyAtmosphere",
+                license="cc-by-4.0",
+                spatial_representation_type="vector",
+                srid="EPSG:32632",
+                extent={"coords": [11.3, 46.4, 11.5, 46.6], "srid": "EPSG:4326"},
+                poc=[1060],
+                is_published=True,
+            )
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._patch(f"datasets/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def replace_dataset(self, pk, **data):
+    def replace_dataset(
+        self,
+        pk,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        ptype=None, ows_url=None, has_elevation=None, has_time=None,
+        is_mosaic=None, elevation_regex=None, time_regex=None,
+        featureinfo_custom_template=None, data=None, metadata=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Full update dataset (PUT)."""
-        resp = self._put(f"datasets/{pk}", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._put(f"datasets/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def delete_dataset(self, pk):
-        """Delete a dataset."""
+        """Delete a dataset.
+
+        Example::
+
+            client.delete_dataset(42)  # returns {"pk": 42, "deleted": True}
+        """
         self._delete(f"datasets/{pk}")
         return {"pk": pk, "deleted": True}
 
     def upload_dataset_metadata(self, pk, xml_file_path):
-        """Upload ISO metadata XML for a dataset (PUT)."""
+        """Upload ISO metadata XML for a dataset (PUT).
+
+        Example::
+
+            client.upload_dataset_metadata(42, "/path/to/metadata.xml")
+        """
         with open(xml_file_path, "rb") as f:
             resp = self._put(f"datasets/{pk}/metadata", files={"metadata_file": f})
         return resp.json()
@@ -159,7 +308,26 @@ class GeoNodeClient:
         return resp.json()
 
     def set_dataset_permissions(self, pk, perms):
-        """Set dataset permissions."""
+        """Set dataset permissions.
+
+        Args:
+            pk: Dataset ID.
+            perms: Dict with "users" and/or "groups" keys. Each maps an
+                identifier to a list of permission strings.
+
+        Example::
+
+            client.set_dataset_permissions(42, {
+                "users": {
+                    "admin": ["view_resourcebase", "download_resourcebase",
+                              "change_resourcebase"],
+                    "viewer": ["view_resourcebase"],
+                },
+                "groups": {
+                    "public": ["view_resourcebase"],
+                },
+            })
+        """
         resp = self._put(f"datasets/{pk}/permissions", json=perms)
         return resp.json()
 
@@ -168,26 +336,203 @@ class GeoNodeClient:
     # ═══════════════════════════════════════════════════════════════════════
 
     def list_maps(self, page=1, page_size=10, **filters):
+        """List maps with optional filters.
+
+        Example::
+
+            client.list_maps()
+            client.list_maps(search="road", page_size=20)
+        """
         params = {"page": page, "page_size": page_size, **filters}
         resp = self._get("maps", params=params)
         return resp.json()
 
     def get_map(self, pk):
+        """Get map details by ID.
+
+        Example::
+
+            map_data = client.get_map(5)
+            print(map_data["title"], map_data["maplayers"])
+        """
         resp = self._get(f"maps/{pk}")
         return resp.json().get("map", resp.json())
 
-    def create_map(self, **data):
-        resp = self._post("maps", json=data)
+    def create_map(
+        self,
+        *,
+        # Essential
+        title=None, abstract=None,
+        # Classification
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        # Map-specific
+        maplayers=None, urlsuffix=None, featuredurl=None,
+        # Dates
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        # Description
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        # Spatial
+        srid=None, spatial_representation_type=None, extent=None,
+        # Publishing
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        # Misc
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        # Contact roles
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
+        """Create a new map.
+
+        Args:
+            title: Map title.
+            abstract: Map description.
+            maplayers: List of layer dicts, each with:
+                - name (str): Dataset alternate name, e.g. "geonode:my_layer".
+                - order (int): Display stacking order (0 = bottom).
+                - visibility (bool): Whether layer is visible on load.
+                - opacity (float): Layer opacity (0.0–1.0).
+                - current_style (str): Active SLD style name.
+                - extra_params (dict): MapStore config, e.g. {"msId": "...", "styles": []}.
+            urlsuffix: Site URL suffix (max 255 chars).
+            featuredurl: Featured map URL (max 255 chars).
+            category: Category identifier string, e.g. "environment".
+            group: Group name or identifier.
+            keywords: Comma-separated string or list, e.g. "climate,water".
+            regions: Region codes, e.g. "ITA".
+            license: License identifier, e.g. "cc-by-4.0".
+            restriction_code_type: Access restriction, e.g. "otherRestrictions".
+            spatial_representation_type: e.g. "vector", "grid".
+            extent: Dict with "coords" [minx, miny, maxx, maxy] and "srid", e.g.
+                {"coords": [10.4, 46.2, 12.9, 47.2], "srid": "EPSG:4326"}.
+            srid: Native spatial reference, e.g. "EPSG:32632".
+            poc: Point of contact — list of user PKs.
+            metadata_author: Metadata author — list of user PKs.
+            maintenance_frequency: e.g. "asNeeded", "daily", "annually".
+            **kwargs: Additional fields forwarded to the API.
+
+        Example::
+
+            # Minimal map
+            client.create_map(title="My Map", abstract="A simple map")
+
+            # Map with layers and metadata
+            client.create_map(
+                title="Road Vulnerability Map",
+                abstract="Betweenness centrality analysis of road networks",
+                category="society",
+                keywords="vulnerability,roads,transalp",
+                license="cc-by-4.0",
+                regions="ITA",
+                is_published=True,
+                maplayers=[
+                    {
+                        "name": "geonode:road_centrality_data",
+                        "order": 0,
+                        "visibility": True,
+                        "opacity": 1.0,
+                        "current_style": "road_vulnerability",
+                        "extra_params": {},
+                    },
+                    {
+                        "name": "geonode:admin_boundaries",
+                        "order": 1,
+                        "visibility": True,
+                        "opacity": 0.5,
+                        "current_style": "default",
+                        "extra_params": {},
+                    },
+                ],
+            )
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        resp = self._post("maps", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def update_map(self, pk, **data):
-        """Partial update map (PATCH)."""
-        resp = self._patch(f"maps/{pk}", json=data)
+    def update_map(
+        self,
+        pk,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        maplayers=None, urlsuffix=None, featuredurl=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
+        """Partial update map (PATCH).
+
+        Args:
+            maplayers: List of layer dicts (see create_map for structure).
+            urlsuffix: Site URL suffix (max 255 chars).
+            featuredurl: Featured map URL (max 255 chars).
+            **kwargs: Additional fields forwarded to the API.
+
+        See create_map for detailed field descriptions.
+
+        Example::
+
+            # Update title and add a layer
+            client.update_map(5, title="Updated Map Title")
+
+            # Change layer visibility
+            client.update_map(5, maplayers=[
+                {"name": "geonode:my_layer", "order": 0, "visibility": False,
+                 "opacity": 1.0, "current_style": "default", "extra_params": {}},
+            ])
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._patch(f"maps/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def replace_map(self, pk, **data):
+    def replace_map(
+        self,
+        pk,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        maplayers=None, urlsuffix=None, featuredurl=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Full update map (PUT)."""
-        resp = self._put(f"maps/{pk}", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._put(f"maps/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def delete_map(self, pk):
@@ -218,7 +563,16 @@ class GeoNodeClient:
         return resp.json().get("document", resp.json())
 
     def upload_document(self, file_path, title=None, abstract=None):
-        """Upload a document file (POST)."""
+        """Upload a document file (POST).
+
+        Example::
+
+            client.upload_document(
+                "/path/to/report.pdf",
+                title="Annual Climate Report 2024",
+                abstract="Summary of climate observations",
+            )
+        """
         with open(file_path, "rb") as f:
             files = {"doc_file": f}
             data = {}
@@ -229,14 +583,92 @@ class GeoNodeClient:
             resp = self._post("documents", files=files, data=data)
         return resp.json()
 
-    def update_document(self, pk, **data):
-        """Partial update document (PATCH)."""
-        resp = self._patch(f"documents/{pk}", json=data)
+    def update_document(
+        self,
+        pk,
+        *,
+        # Essential
+        title=None, abstract=None,
+        # Classification
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        # Document-specific
+        extension=None, doc_url=None,
+        # Dates
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        # Description
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        # Spatial
+        srid=None, spatial_representation_type=None, extent=None,
+        # Publishing
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        # Misc
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        # Contact roles
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
+        """Partial update document (PATCH).
+
+        Args:
+            extension: File extension (max 128 chars, nullable).
+            doc_url: External document URL (max 512 chars, nullable).
+            category: Category identifier string, e.g. "environment".
+            keywords: Comma-separated string or list, e.g. "report,climate".
+            license: License identifier, e.g. "cc-by-4.0".
+            **kwargs: Additional fields forwarded to the API.
+
+        See create_map for detailed descriptions of shared ResourceBase fields.
+
+        Example::
+
+            client.update_document(
+                10,
+                title="Updated Report",
+                doc_url="https://example.com/report-v2.pdf",
+                category="environment",
+                keywords="climate,report",
+            )
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._patch(f"documents/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def replace_document(self, pk, **data):
+    def replace_document(
+        self,
+        pk,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        extension=None, doc_url=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Full update document (PUT)."""
-        resp = self._put(f"documents/{pk}", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._put(f"documents/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def delete_document(self, pk):
@@ -261,18 +693,116 @@ class GeoNodeClient:
         resp = self._get(f"geoapps/{pk}")
         return resp.json().get("geoapp", resp.json())
 
-    def create_geoapp(self, **data):
-        resp = self._post("geoapps", json=data)
+    def create_geoapp(
+        self,
+        *,
+        # Essential
+        title=None, abstract=None, name=None,
+        # Classification
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        # Dates
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        # Description
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        # Spatial
+        srid=None, spatial_representation_type=None, extent=None,
+        # Publishing
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        # Misc
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        # Contact roles
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
+        """Create a new GeoApp.
+
+        Args:
+            title: GeoApp title.
+            abstract: GeoApp description.
+            name: GeoApp name (writable, unlike other resource types).
+            category: Category identifier string, e.g. "environment".
+            keywords: Comma-separated string or list.
+            license: License identifier, e.g. "cc-by-4.0".
+            **kwargs: Additional fields forwarded to the API.
+
+        See create_map for detailed descriptions of shared ResourceBase fields.
+
+        Example::
+
+            client.create_geoapp(
+                name="climate-dashboard",
+                title="Climate Dashboard",
+                abstract="Interactive climate data visualization",
+                category="climatologyMeteorologyAtmosphere",
+            )
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        resp = self._post("geoapps", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def update_geoapp(self, pk, **data):
+    def update_geoapp(
+        self,
+        pk,
+        *,
+        title=None, abstract=None, name=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Partial update geoapp (PATCH)."""
-        resp = self._patch(f"geoapps/{pk}", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._patch(f"geoapps/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def replace_geoapp(self, pk, **data):
+    def replace_geoapp(
+        self,
+        pk,
+        *,
+        title=None, abstract=None, name=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Full update geoapp (PUT)."""
-        resp = self._put(f"geoapps/{pk}", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._put(f"geoapps/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def delete_geoapp(self, pk):
@@ -284,11 +814,28 @@ class GeoNodeClient:
     # ═══════════════════════════════════════════════════════════════════════
 
     def list_resources(self, page=1, page_size=10, **filters):
+        """List all resources with optional filters.
+
+        Example::
+
+            # All resources
+            client.list_resources(page_size=50)
+
+            # Filtered by type and category
+            client.list_resources(resource_type="dataset", category__identifier="environment")
+        """
         params = {"page": page, "page_size": page_size, **filters}
         resp = self._get("resources", params=params)
         return resp.json()
 
     def search_resources(self, query, page=1, page_size=10):
+        """Full-text search across all resources.
+
+        Example::
+
+            results = client.search_resources("temperature")
+            results = client.search_resources("road vulnerability", page_size=20)
+        """
         resp = self._get(
             "resources",
             params={
@@ -303,19 +850,87 @@ class GeoNodeClient:
         resp = self._get(f"resources/{pk}")
         return resp.json().get("resource", resp.json())
 
-    def create_resource(self, **data):
+    def create_resource(
+        self,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Create a resource (POST)."""
-        resp = self._post("resources", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        resp = self._post("resources", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def update_resource(self, pk, **data):
+    def update_resource(
+        self,
+        pk,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Partial update resource (PATCH)."""
-        resp = self._patch(f"resources/{pk}", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._patch(f"resources/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def replace_resource(self, pk, **data):
+    def replace_resource(
+        self,
+        pk,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Full update resource (PUT)."""
-        resp = self._put(f"resources/{pk}", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._put(f"resources/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def delete_resource(self, pk):
@@ -330,12 +945,51 @@ class GeoNodeClient:
         return resp.json()
 
     def set_resource_permissions(self, pk, perms):
-        """Set resource permissions (PUT)."""
+        """Set resource permissions (PUT — replaces all permissions).
+
+        Args:
+            pk: Resource ID.
+            perms: Dict with "users" and/or "groups" keys. Each maps an
+                identifier to a list of permission strings. Example::
+
+                    {"users": {"admin": ["view_resourcebase", "download_resourcebase",
+                                         "change_resourcebase"]},
+                     "groups": {"my-group": ["view_resourcebase"]}}
+
+                Common permissions: view_resourcebase, download_resourcebase,
+                change_resourcebase, change_resourcebase_metadata,
+                change_resourcebase_permissions, publish_resourcebase.
+
+        Example::
+
+            client.set_resource_permissions(42, {
+                "users": {
+                    "admin": ["view_resourcebase", "download_resourcebase",
+                              "change_resourcebase"],
+                },
+                "groups": {
+                    "public": ["view_resourcebase"],
+                },
+            })
+        """
         resp = self._put(f"resources/{pk}/permissions", json=perms)
         return resp.json()
 
     def patch_resource_permissions(self, pk, perms):
-        """Patch resource permissions (PATCH)."""
+        """Patch resource permissions (PATCH — merges with existing).
+
+        Args:
+            pk: Resource ID.
+            perms: Same format as set_resource_permissions. Only the specified
+                users/groups are updated; others are left unchanged.
+
+        Example::
+
+            # Grant download access to a specific user without affecting others
+            client.patch_resource_permissions(42, {
+                "users": {"newuser": ["view_resourcebase", "download_resourcebase"]},
+            })
+        """
         resp = self._patch(f"resources/{pk}/permissions", json=perms)
         return resp.json()
 
@@ -346,14 +1000,71 @@ class GeoNodeClient:
 
     # ── Resource async operations ──
 
-    def async_create_resource(self, resource_type, **data):
-        """Create resource asynchronously (returns execution_id)."""
-        resp = self._post(f"resources/create/{resource_type}", json=data)
+    def async_create_resource(
+        self,
+        resource_type,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
+        """Create resource asynchronously (returns execution_id).
+
+        Example::
+
+            result = client.async_create_resource(
+                "dataset",
+                title="Async Dataset",
+                abstract="Created asynchronously",
+            )
+            exec_id = result["execution_id"]
+            status = client.get_execution_status(exec_id)
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "resource_type", "kwargs")}
+        resp = self._post(f"resources/create/{resource_type}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def async_update_resource(self, pk, **data):
+    def async_update_resource(
+        self,
+        pk,
+        *,
+        title=None, abstract=None,
+        category=None, group=None, keywords=None, tkeywords=None, regions=None,
+        license=None, restriction_code_type=None,
+        date=None, date_type=None,
+        temporal_extent_start=None, temporal_extent_end=None,
+        purpose=None, edition=None, maintenance_frequency=None,
+        supplemental_information=None, data_quality_statement=None,
+        constraints_other=None,
+        srid=None, spatial_representation_type=None, extent=None,
+        is_published=None, is_approved=None, featured=None,
+        advertised=None, metadata_only=None, metadata_uploaded_preserve=None,
+        attribution=None, doi=None, language=None, embed_url=None,
+        resource_type=None, subtype=None, blob=None,
+        popular_count=None, share_count=None, rating=None,
+        poc=None, metadata_author=None, processor=None, publisher=None,
+        custodian=None, distributor=None, resource_user=None,
+        resource_provider=None, originator=None, principal_investigator=None,
+        **kwargs,
+    ):
         """Update resource asynchronously (returns execution_id)."""
-        resp = self._put(f"resources/{pk}/update", json=data)
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._put(f"resources/{pk}/update", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def async_delete_resource(self, pk):
@@ -362,7 +1073,12 @@ class GeoNodeClient:
         return {"pk": pk, "async_delete": True}
 
     def copy_resource(self, pk):
-        """Copy/clone resource asynchronously (returns execution_id)."""
+        """Copy/clone resource asynchronously (returns execution_id).
+
+        Example::
+
+            result = client.copy_resource(42)
+        """
         resp = self._put(f"resources/{pk}/copy")
         return resp.json()
 
@@ -401,7 +1117,12 @@ class GeoNodeClient:
     # ── Favorites ──
 
     def add_favorite(self, pk):
-        """Add resource to favorites (POST)."""
+        """Add resource to favorites (POST).
+
+        Example::
+
+            client.add_favorite(42)
+        """
         resp = self._post(f"resources/{pk}/favorite")
         return resp.json()
 
@@ -413,7 +1134,19 @@ class GeoNodeClient:
     # ── Thumbnails ──
 
     def set_thumbnail(self, pk, file_path=None, url=None, base64_data=None):
-        """Set resource thumbnail (PUT). Supports file, URL, or base64."""
+        """Set resource thumbnail (PUT). Supports file, URL, or base64.
+
+        Example::
+
+            # From a local file
+            client.set_thumbnail(42, file_path="/path/to/thumb.png")
+
+            # From a URL
+            client.set_thumbnail(42, url="https://example.com/thumb.png")
+
+            # From base64
+            client.set_thumbnail(42, base64_data="data:image/png;base64,iVBOR...")
+        """
         if file_path:
             with open(file_path, "rb") as f:
                 resp = self._put(
@@ -432,7 +1165,18 @@ class GeoNodeClient:
         return resp.json()
 
     def set_thumbnail_from_bbox(self, pk, bbox, srid="EPSG:4326"):
-        """Set thumbnail from bounding box (POST)."""
+        """Set thumbnail from bounding box (POST).
+
+        Args:
+            pk: Resource ID.
+            bbox: Bounding box as [minx, miny, maxx, maxy], e.g. [-180, -90, 180, 90].
+            srid: Spatial reference of the bbox, default "EPSG:4326".
+
+        Example::
+
+            client.set_thumbnail_from_bbox(42, [11.3, 46.4, 11.5, 46.6])
+            client.set_thumbnail_from_bbox(42, [11.3, 46.4, 11.5, 46.6], srid="EPSG:32632")
+        """
         resp = self._post(
             f"resources/{pk}/set-thumbnail-from-bbox", json={"bbox": bbox, "srid": srid}
         )
@@ -446,12 +1190,29 @@ class GeoNodeClient:
         return resp.json()
 
     def add_extra_metadata(self, pk, metadata):
-        """Add new extra metadata (POST)."""
+        """Add new extra metadata (POST).
+
+        Args:
+            pk: Resource ID.
+            metadata: List of dicts, each with "metadata_type" and "metadata_value".
+
+        Example::
+
+            client.add_extra_metadata(42, [
+                {"metadata_type": "doi", "metadata_value": "10.1234/test"},
+                {"metadata_type": "source", "metadata_value": "satellite"},
+            ])
+        """
         resp = self._post(f"resources/{pk}/extra-metadata", json=metadata)
         return resp.json()
 
     def update_extra_metadata(self, pk, metadata):
-        """Update extra metadata (PUT)."""
+        """Update extra metadata (PUT — replaces all extra metadata).
+
+        Args:
+            pk: Resource ID.
+            metadata: List of dicts (same format as add_extra_metadata).
+        """
         resp = self._put(f"resources/{pk}/extra-metadata", json=metadata)
         return resp.json()
 
@@ -475,21 +1236,40 @@ class GeoNodeClient:
         return resp.json()
 
     def add_linked_resources(self, pk, linked_pks):
-        """Add linked resources (POST)."""
+        """Add linked resources (POST).
+
+        Args:
+            pk: Resource ID.
+            linked_pks: List of resource PKs to link, e.g. [2, 3, 15].
+
+        Example::
+
+            client.add_linked_resources(42, [10, 15, 23])
+        """
         resp = self._post(
             f"resources/{pk}/linked-resources", json={"target": linked_pks}
         )
         return resp.json()
 
     def remove_linked_resources(self, pk, linked_pks):
-        """Remove linked resources (DELETE)."""
+        """Remove linked resources (DELETE).
+
+        Args:
+            pk: Resource ID.
+            linked_pks: List of resource PKs to unlink, e.g. [2, 3].
+        """
         self._delete(f"resources/{pk}/linked-resources", json={"target": linked_pks})
         return {"pk": pk, "unlinked": linked_pks}
 
     # ── Assets ──
 
     def upload_asset(self, pk, file_path):
-        """Upload and create asset for a resource (POST)."""
+        """Upload and create asset for a resource (POST).
+
+        Example::
+
+            client.upload_asset(42, "/data/supplementary_table.csv")
+        """
         with open(file_path, "rb") as f:
             resp = self._post(f"resources/{pk}/assets", files={"asset_file": f})
         return resp.json()
@@ -511,17 +1291,72 @@ class GeoNodeClient:
         resp = self._get(f"users/{pk}")
         return resp.json()
 
-    def create_user(self, username, password, email=None, **extra):
-        """Create a new user (POST)."""
-        data = {"username": username, "password": password, **extra}
-        if email:
-            data["email"] = email
-        resp = self._post("users", json=data)
+    def create_user(
+        self,
+        username,
+        password,
+        *,
+        email=None,
+        first_name=None,
+        last_name=None,
+        is_superuser=None,
+        is_staff=None,
+        **kwargs,
+    ):
+        """Create a new user (POST).
+
+        Args:
+            username: Required. 150 chars max. Letters, digits, @/./+/-/_ only.
+            password: User password.
+            email: Email address (max 254 chars).
+            first_name: First name (max 150 chars).
+            last_name: Last name (max 150 chars).
+            is_superuser: Grant all permissions without explicit assignment.
+            is_staff: Allow access to admin site.
+            **kwargs: Additional fields forwarded to the API.
+
+        Example::
+
+            client.create_user(
+                "jdoe", "secretpass123",
+                email="jdoe@example.com",
+                first_name="John",
+                last_name="Doe",
+            )
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        resp = self._post("users", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def update_user(self, pk, **data):
-        """Partial update user (PATCH)."""
-        resp = self._patch(f"users/{pk}", json=data)
+    def update_user(
+        self,
+        pk,
+        *,
+        username=None,
+        first_name=None,
+        last_name=None,
+        email=None,
+        is_superuser=None,
+        is_staff=None,
+        **kwargs,
+    ):
+        """Partial update user (PATCH).
+
+        Args:
+            username: 150 chars max. Letters, digits, @/./+/-/_ only.
+            first_name: First name (max 150 chars).
+            last_name: Last name (max 150 chars).
+            email: Email address (max 254 chars).
+            is_superuser: Grant all permissions without explicit assignment.
+            is_staff: Allow access to admin site.
+            **kwargs: Additional fields forwarded to the API.
+
+        Example::
+
+            client.update_user(1060, first_name="Jane", email="jane@example.com")
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._patch(f"users/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def delete_user(self, pk):
@@ -561,7 +1396,33 @@ class GeoNodeClient:
     def upload_dataset(
         self, file_path, title=None, abstract=None, category=None, keywords=None
     ):
-        """Upload a geospatial dataset file (async via /uploads/upload/)."""
+        """Upload a geospatial dataset file (async via /uploads/upload/).
+
+        Args:
+            file_path: Path to a geospatial file (.shp, .geojson, .tif, .gpkg, etc.).
+            title: Dataset title (defaults to filename).
+            abstract: Dataset description.
+            category: Category identifier, e.g. "environment".
+            keywords: Comma-separated string or list, e.g. "climate,water" or ["climate", "water"].
+
+        Example::
+
+            # Simple upload
+            client.upload_dataset("/data/rivers.geojson")
+
+            # Upload with metadata
+            result = client.upload_dataset(
+                "/data/temperature.tif",
+                title="Temperature Raster 2024",
+                abstract="Annual mean temperature",
+                category="climatologyMeteorologyAtmosphere",
+                keywords=["temperature", "climate", "2024"],
+            )
+            # Poll until complete
+            upload_id = result.get("id")
+            if upload_id:
+                client.poll_upload(upload_id)
+        """
         url = f"{self.base_url}/uploads/upload/"
         with open(file_path, "rb") as f:
             files = {"base_file": f}
@@ -597,7 +1458,13 @@ class GeoNodeClient:
         return resp.json()
 
     def poll_upload(self, pk, timeout=120, interval=3):
-        """Poll upload status until complete or timeout."""
+        """Poll upload status until complete or timeout.
+
+        Example::
+
+            result = client.upload_dataset("/data/rivers.geojson")
+            status = client.poll_upload(result["id"], timeout=300, interval=5)
+        """
         start = time.time()
         while time.time() - start < timeout:
             status = self.get_upload(pk)
@@ -618,7 +1485,12 @@ class GeoNodeClient:
         return resp.json()
 
     def create_import(self, file_path, **params):
-        """Create a new import/upload via importer (POST)."""
+        """Create a new import/upload via importer (POST).
+
+        Example::
+
+            client.create_import("/data/buildings.gpkg", store_spatial_files=True)
+        """
         with open(file_path, "rb") as f:
             files = {"base_file": f}
             resp = self._post("imports", files=files, data=params)
@@ -629,9 +1501,32 @@ class GeoNodeClient:
         resp = self._get("upload-size-limits")
         return resp.json()
 
-    def create_upload_size_limit(self, **data):
-        """Create new upload size limit."""
-        resp = self._post("upload-size-limits", json=data)
+    def create_upload_size_limit(
+        self,
+        *,
+        slug=None,
+        description=None,
+        max_size=None,
+        **kwargs,
+    ):
+        """Create new upload size limit.
+
+        Args:
+            slug: Identifier (3-255 chars, alphanumeric/hyphens/underscores).
+            description: Limit description (max 255 chars, nullable).
+            max_size: Maximum file size in bytes.
+            **kwargs: Additional fields forwarded to the API.
+
+        Example::
+
+            client.create_upload_size_limit(
+                slug="dataset-max-size",
+                description="Max upload size for datasets",
+                max_size=104857600,  # 100 MB
+            )
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        resp = self._post("upload-size-limits", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def get_upload_parallelism_limits(self):
@@ -639,9 +1534,29 @@ class GeoNodeClient:
         resp = self._get("upload-parallelism-limits")
         return resp.json()
 
-    def create_upload_parallelism_limit(self, **data):
-        """Create new upload parallelism limit."""
-        resp = self._post("upload-parallelism-limits", json=data)
+    def create_upload_parallelism_limit(
+        self,
+        *,
+        description=None,
+        max_number=None,
+        **kwargs,
+    ):
+        """Create new upload parallelism limit.
+
+        Args:
+            description: Limit description (max 255 chars, nullable).
+            max_number: Maximum parallel uploads (0-32767).
+            **kwargs: Additional fields forwarded to the API.
+
+        Example::
+
+            client.create_upload_parallelism_limit(
+                description="Default parallelism",
+                max_number=5,
+            )
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        resp = self._post("upload-parallelism-limits", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -682,12 +1597,96 @@ class GeoNodeClient:
         resp = self._get(f"harvesters/{pk}")
         return resp.json()
 
-    def create_harvester(self, **data):
-        resp = self._post("harvesters", json=data)
+    def create_harvester(
+        self,
+        *,
+        name=None,
+        remote_url=None,
+        scheduling_enabled=None,
+        harvester_type=None,
+        harvester_type_specific_configuration=None,
+        default_owner=None,
+        harvest_new_resources_by_default=None,
+        delete_orphan_resources_automatically=None,
+        check_availability_frequency=None,
+        harvesting_session_update_frequency=None,
+        refresh_harvestable_resources_update_frequency=None,
+        last_check_harvestable_resources_message=None,
+        **kwargs,
+    ):
+        """Create a new harvester.
+
+        Args:
+            name: Harvester name (max 255 chars, required).
+            remote_url: Base URL of the remote service to harvest (required).
+                e.g. "https://example.com/geoserver/wms".
+            scheduling_enabled: Periodically schedule harvesting.
+            harvester_type: Harvester class. Common values:
+                - "geonode.harvesting.harvesters.geonodeharvester.GeonodeUnifiedHarvesterWorker"
+                - "geonode.harvesting.harvesters.wms.OgcWmsHarvester"
+                - "geonode.harvesting.harvesters.arcgis.ArcgisHarvesterWorker"
+                See GeoNode HARVESTER_CLASSES setting for all options.
+            harvester_type_specific_configuration: Config dict specific to the
+                harvester_type. At minimum an empty dict {} is required.
+            default_owner: User PK for default resource owner.
+            harvest_new_resources_by_default: Auto-harvest new resources.
+            delete_orphan_resources_automatically: Auto-delete resources no longer
+                found on the remote service.
+            check_availability_frequency: Minutes between availability checks (int >= 0).
+            harvesting_session_update_frequency: Minutes between harvest sessions (int >= 0).
+            refresh_harvestable_resources_update_frequency: Minutes between refresh
+                sessions (int >= 0).
+            **kwargs: Additional fields forwarded to the API.
+
+        Example::
+
+            # Harvest from an OGC WMS service
+            client.create_harvester(
+                name="EURAC WMS Harvester",
+                remote_url="https://edp-portal.eurac.edu/geoserver/wms",
+                harvester_type="geonode.harvesting.harvesters.wms.OgcWmsHarvester",
+                scheduling_enabled=True,
+                check_availability_frequency=10,
+                harvesting_session_update_frequency=60,
+                refresh_harvestable_resources_update_frequency=30,
+                default_owner=1000,
+                harvest_new_resources_by_default=True,
+                harvester_type_specific_configuration={},
+            )
+
+            # Harvest from another GeoNode instance
+            client.create_harvester(
+                name="Remote GeoNode",
+                remote_url="https://other-geonode.org",
+                harvester_type="geonode.harvesting.harvesters.geonodeharvester.GeonodeUnifiedHarvesterWorker",
+                harvester_type_specific_configuration={},
+            )
+        """
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "kwargs")}
+        resp = self._post("harvesters", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
-    def update_harvester(self, pk, **data):
-        resp = self._patch(f"harvesters/{pk}", json=data)
+    def update_harvester(
+        self,
+        pk,
+        *,
+        name=None,
+        remote_url=None,
+        scheduling_enabled=None,
+        harvester_type=None,
+        harvester_type_specific_configuration=None,
+        default_owner=None,
+        harvest_new_resources_by_default=None,
+        delete_orphan_resources_automatically=None,
+        check_availability_frequency=None,
+        harvesting_session_update_frequency=None,
+        refresh_harvestable_resources_update_frequency=None,
+        last_check_harvestable_resources_message=None,
+        **kwargs,
+    ):
+        """Partial update harvester (PATCH)."""
+        _locals = {k: v for k, v in locals().items() if k not in ("self", "pk", "kwargs")}
+        resp = self._patch(f"harvesters/{pk}", json=self._build_payload(_locals, kwargs))
         return resp.json()
 
     def get_harvestable_resources(self, harvester_pk, page=1, page_size=10):
@@ -748,7 +1747,12 @@ class GeoNodeClient:
         return resp.json()
 
     def autocomplete_users(self, query=""):
-        """Autocomplete users for metadata."""
+        """Autocomplete users for metadata.
+
+        Example::
+
+            client.autocomplete_users("john")  # search by name/username
+        """
         resp = self._get(
             "metadata/autocomplete/users", params={"q": query} if query else {}
         )
@@ -822,7 +1826,19 @@ class GeoNodeClient:
         topic_contains=None,
         **filters,
     ):
-        """Get facet details with topics/options."""
+        """Get facet details with topics/options.
+
+        Example::
+
+            # List all available facets
+            client.list_facets()
+
+            # Get category facet with counts
+            client.get_facet("category")
+
+            # Get keyword facet filtered by text
+            client.get_facet("keyword", topic_contains="climate", lang="en")
+        """
         params = {"page": page, "page_size": page_size, **filters}
         if lang:
             params["lang"] = lang
@@ -898,7 +1914,12 @@ class GeoNodeClient:
         return resp.json()
 
     def verify_token(self, token):
-        """Verify an access token."""
+        """Verify an access token.
+
+        Example::
+
+            client.verify_token("eyJhbGciOi...")
+        """
         resp = self._post("verify-token", json={"token": token})
         return resp.json()
 
